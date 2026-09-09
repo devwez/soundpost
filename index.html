@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>soundpost</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0b0d0c;
+    color: #b6c2ba;
+    font-family: "Cascadia Code", Consolas, monospace;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  ::selection { background: #2c4a33; }
+  h1 {
+    font-size: 22px;
+    color: #9fe0aa;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+  .tag { color: #6a7a70; font-size: 12px; margin-top: 4px; }
+  section {
+    margin-top: 26px;
+    border-top: 1px dashed #233028;
+    padding-top: 18px;
+  }
+  h2 {
+    font-size: 12px;
+    color: #7a8a80;
+    font-weight: normal;
+    text-transform: lowercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+  textarea {
+    width: 100%;
+    background: #0e1210;
+    border: 1px solid #26332b;
+    color: #d4e2d8;
+    font-family: inherit;
+    font-size: 14px;
+    padding: 10px;
+    resize: vertical;
+    outline: none;
+  }
+  textarea:focus { border-color: #3a5244; }
+  textarea::placeholder { color: #4a564e; }
+  .under {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: #16211b;
+    color: #b6c2ba;
+    border: 1px solid #2c3a31;
+    padding: 7px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  button:hover { background: #1e2c23; }
+  button:disabled { opacity: .35; cursor: default; }
+  button.go { border-color: #3f5c4a; color: #9fe0aa; }
+  .k { color: #56645b; font-size: 11px; }
+  .count { color: #6a7a70; font-size: 12px; min-width: 110px; }
+  .status { color: #6a7a70; font-size: 12px; }
+  .status.ok { color: #9fe0aa; }
+  .status.bad { color: #d98a7a; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 120px;
+    background: #060807;
+    border: 1px solid #1c2620;
+    margin-top: 10px;
+  }
+  .level { color: #4a564e; font-size: 11px; }
+  p.notes { color: #8a988e; font-size: 13px; margin-bottom: 12px; }
+  pre#tonemap {
+    background: #0e1210;
+    border: 1px solid #1c2620;
+    padding: 12px;
+    font-size: 11px;
+    color: #7a8a80;
+    overflow-x: auto;
+    line-height: 1.7;
+  }
+  .known { color: #7a8a80; font-size: 12px; margin: 12px 0 4px; }
+  ul { list-style: none; }
+  li { color: #6a7a70; font-size: 12px; padding-left: 14px; position: relative; }
+  li:before { content: "-"; position: absolute; left: 0; color: #3f5c4a; }
+</style>
+</head>
+<body>
+
+<h1>soundpost</h1>
+<p class="tag">sends text through the air as sound. no internet, no bluetooth, just a speaker and a mic.</p>
+
+<section>
+  <h2>send</h2>
+  <textarea id="msg" rows="3" placeholder="type something..."></textarea>
+  <div class="under">
+    <span class="count" id="count">0 chars</span>
+    <button class="go" id="play">play</button>
+    <button id="stop">stop</button>
+    <button id="wav">save wav</button>
+    <label class="k"><input type="checkbox" id="twice"> send each char twice (noisy rooms)</label>
+    <span class="k">ctrl+enter plays too</span>
+  </div>
+  <p class="status" id="encStatus"></p>
+</section>
+
+<section>
+  <h2>receive</h2>
+  <textarea id="out" rows="3" readonly placeholder="decoded text shows up here"></textarea>
+  <div class="under">
+    <button class="go" id="listen">start listening</button>
+    <button id="quiet" disabled>stop</button>
+    <label class="k">or decode a wav: <input type="file" id="wavfile" accept=".wav,audio/wav"></label>
+    <span class="status" id="decStatus">start listening, then hit play (on this or another device)</span>
+  </div>
+  <canvas id="spec" width="640" height="120"></canvas>
+  <span class="level" id="level"></span>
+</section>
+
+<section>
+  <h2>how it works</h2>
+  <p class="notes">
+    every character becomes one short chirp made of two tones playing at the same time.
+    three leader chirps go first so the decoder knows where the message starts (five in
+    2x mode — the count is how the decoder knows), and an end marker (higher than any
+    letter) says when to stop. one extra chirp rides at the end as a checksum, so the
+    decoder can tell you it misheard something instead of silently handing you garbage.
+    the decoder listens on the mic and matches what it hears against the tone table.
+  </p>
+  <pre id="tonemap"></pre>
+  <p class="known">known issues:</p>
+  <ul>
+    <li>needs a quiet room, the mic hears absolutely everything</li>
+    <li>repeated letters (ll, ss) sometimes merge into one. the gap between chars is 90ms to make that less likely — 2x mode doesn't have this problem since doubles are on purpose there</li>
+    <li>the checksum catches a bad chirp but can't fix it, it just tells you to send again. 2x mode is the closest thing to an actual fix so far</li>
+    <li>wav decoding only understands files the save wav button wrote (16 bit mono pcm). feed it music and you get garbage back</li>
+    <li>only handles a-z, 0-9 and basic punctuation, everything else gets dropped before sending</li>
+    <li>if nothing decodes, turn your volume up. the level readout below the spectrogram shows what the mic is picking up</li>
+  </ul>
+</section>
+
+<script>
+"use strict";
+
+// ---------- shared ----------
+let actx = null;
+function getActx() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+
+const CHIRP = 0.08;  // how long each tone plays for
+const GAP   = 0.09;  // silence between chars, long on purpose (see known issues)
+const SWEEP = 40;    // each tone sweeps up a bit so it doesn't sound like a fire alarm
+
+// leader goes before every message, end marker after. both sit above every
+// letter on purpose so the decoder can never confuse them with real chars
+const LEADER = [6750, 6850];
+const END    = [6950, 7050];
+
+// char -> two frequencies that play at the same time
+// (there's a weird gap after s because i changed the spacing halfway through
+// and redoing the whole table would break the decoder, so it stays)
+const TONES = {
+  "a":[200,280],  "b":[300,380],  "c":[400,480],  "d":[500,580],
+  "e":[600,680],  "f":[700,780],  "g":[800,880],  "h":[900,980],
+  "i":[1000,1080],"j":[1100,1180],"k":[1200,1280],"l":[1300,1380],
+  "m":[1400,1480],"n":[1500,1580],"o":[1600,1680],"p":[1700,1780],
+  "q":[1800,1880],"r":[1900,1980],"s":[2000,2100],"t":[2200,2300],
+  "u":[2400,2500],"v":[2600,2700],"w":[2800,2900],"x":[3000,3100],
+  "y":[3200,3300],"z":[3400,3500],"0":[3600,3700],"1":[3800,3900],
+  "2":[4000,4100],"3":[4200,4300],"4":[4400,4500],"5":[4600,4700],
+  "6":[4800,4900],"7":[5000,5100],"8":[5200,5300],"9":[5400,5500],
+  " ":[5600,5800],".":[5900,5950],",":[6000,6050],"?":[6100,6150],
+  "!":[6200,6250],"-":[6300,6350],"@":[6400,6450],"#":[6500,6550]
+};
+
+const KEYS = Object.keys(TONES);
+
+// checksum = sum of every char's position in the tone table, mod table size,
+// sent as one extra char right before the end marker. won't survive a physics
+// exam but it catches dropped and misheard chirps, which is what actually
+// happens in a real room
+function checksumChar(s) {
+  let sum = 0;
+  for (let i = 0; i < s.length; i++) sum += KEYS.indexOf(s[i]);
+  return KEYS[sum % KEYS.length];
+}
+
+// ---------- encoding ----------
+function encodeMessage(msg, twice) {
+  const sr = 48000;
+  const slot = CHIRP + GAP;
+  const schedule = [];
+
+  // 3 leader chirps normally, 5 in 2x mode. the count itself is the signal —
+  // the decoder counts them and knows the mode before any chars show up
+  const leadN = twice ? 5 : 3;
+  for (let i = 0; i < leadN; i++) schedule.push({ t: i * slot, tones: LEADER });
+
+  const charsStart = leadN * slot + 0.06;
+  let slotAt = 0;
+  for (let i = 0; i < msg.length; i++) {
+    schedule.push({ t: charsStart + slotAt++ * slot, tones: TONES[msg[i]] });
+    if (twice) schedule.push({ t: charsStart + slotAt++ * slot, tones: TONES[msg[i]] });
+  }
+
+  schedule.push({ t: charsStart + slotAt * slot, tones: END });
+
+  const total = charsStart + (slotAt + 1) * slot + 0.15;
+  const buf = new Float32Array(Math.ceil(total * sr));
+
+  for (const s of schedule) {
+    const at = Math.floor(s.t * sr);
+    const dur = Math.floor(CHIRP * sr);
+    for (let i = 0; i < dur; i++) {
+      // quick fade in/out so there's no click at the edges
+      const env = Math.min(1, i / 300, (dur - i) / 300);
+      for (const f of s.tones) {
+        // laptop speakers get quiet up top, so higher tones play louder
+        const vol = 0.28 + (f / 7500) * 0.2;
+        const freq = f + SWEEP * (i / dur);
+        buf[at + i] += Math.sin(2 * Math.PI * freq * (i / sr)) * vol * env;
+      }
+    }
+  }
+  return { samples: buf, sr: sr, secs: total };
+}
+
+// ---------- playback ----------
+let playing = null;
+let lastEnc = null;
+
+function playEncoded(enc) {
+  const actx = getActx();
+  const audioBuf = actx.createBuffer(1, enc.samples.length, enc.sr);
+  audioBuf.getChannelData(0).set(enc.samples);
+  const src = actx.createBufferSource();
+  src.buffer = audioBuf;
+  src.connect(actx.destination);
+  src.start();
+  playing = src;
+  src.onended = () => { playing = null; };
+}
+
+function stopPlayback() {
+  if (playing) {
+    try { playing.stop(); } catch (e) {}
+    playing = null;
+  }
+}
+
+// tiny wav writer, 44 byte header + 16 bit pcm. made this so i can test the
+// decoder from a saved recording instead of needing two devices
+function toWav(enc) {
+  const n = enc.samples.length;
+  const out = new ArrayBuffer(44 + n * 2);
+  const v = new DataView(out);
+  const str = (off, s) => {
+    for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i));
+  };
+  str(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); str(8, "WAVE");
+  str(12, "fmt "); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, enc.sr, true); v.setUint32(28, enc.sr * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, "data"); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) {
+    const s = Math.max(-1, Math.min(1, enc.samples[i]));
+    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return new Blob([out], { type: "audio/wav" });
+}
+
+function saveWav(enc) {
+  const url = URL.createObjectURL(toWav(enc));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "soundpost.wav";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+// ---------- decoding from the mic ----------
+// no real fft, just a goertzel per frequency i care about. good enough.
+function probe(data, sr, freq) {
+  let real = 0, imag = 0;
+  const n = data.length;
+  for (let i = 0; i < n; i++) {
+    const ph = -2 * Math.PI * freq * i / sr;
+    real += data[i] * Math.cos(ph);
+    imag += data[i] * Math.sin(ph);
+  }
+  return Math.sqrt(real * real + imag * imag) / n;
+}
+
+let micStream = null;
+async function getMic() {
+  if (micStream) return micStream;
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  return micStream;
+}
+
+let analyser = null;
+let listening = false;
+let tickTimer = null;
+let td = null;
+const TICK = 30; // ms per decode check
+
+// decode state
+let armed = false;      // true once the leader chirps were seen
+let leadCount = 0;
+let leadWasLoud = false;
+let extraLeaders = 0;   // leaders seen after arming — 2 or more means 2x mode
+let extraLoud = false;
+let inTone = false;
+let curSym = null;
+let quietTicks = 0;
+let out = "";
+
+function tick() {
+  if (!listening) return;
+  analyser.getFloatTimeDomainData(td);
+
+  // raw level readout so i can tell if the mic hears anything at all
+  let rms = 0;
+  for (let i = 0; i < td.length; i++) rms += td[i] * td[i];
+  rms = Math.sqrt(rms / td.length);
+  levelEl.textContent = "mic level: " + rms.toFixed(4);
+
+  if (rms < 0.004) {
+    // basically silence, skip all the probing
+    onQuiet();
+  } else {
+    const sr = actx.sampleRate;
+    const leadE = probe(td, sr, LEADER[0]) + probe(td, sr, LEADER[1]);
+    const endE  = probe(td, sr, END[0])    + probe(td, sr, END[1]);
+
+    if (!armed) {
+      // count rising edges of the leader tone, 3 edges = message incoming
+      if (leadE > 0.02) {
+        if (!leadWasLoud) { leadCount++; leadWasLoud = true; }
+      } else {
+        leadWasLoud = false;
+      }
+      if (leadCount >= 3) {
+        armed = true;
+        inTone = false; curSym = null; quietTicks = 0;
+        setDec("locked on, reading...");
+      }
+    } else if (endE > 0.02) {
+      if (inTone) { out += curSym; inTone = false; }
+      finishDecode();
+      return;
+    } else {
+      // leftover leaders from a 2x message (5 sent, we armed at 3) land here
+      // before the first char. count them instead of letting them read as
+      // silence — 2 or more after arming means the message is doubled
+      if (leadE > 0.02) {
+        if (!extraLoud) { extraLoud = true; if (out.length === 0 && !inTone) extraLeaders++; }
+      } else {
+        extraLoud = false;
+      }
+      let best = null, bestScore = 0;
+      for (const ch in TONES) {
+        const t = TONES[ch];
+        const s = probe(td, sr, t[0]) + probe(td, sr, t[1]);
+        if (s > bestScore) { bestScore = s; best = ch; }
+      }
+      if (bestScore > 0.012) {
+        quietTicks = 0;
+        if (!inTone) {
+          inTone = true; curSym = best;
+        } else if (best !== curSym) {
+          // tone changed without a gap in between, ship what we had
+          out += curSym; curSym = best;
+          refreshOut();
+        }
+      } else {
+        onQuiet();
+      }
+      if (out.length > 400) finishDecode(); // safety, don't decode forever
+    }
+  }
+
+  tickTimer = setTimeout(tick, TICK);
+}
+
+// one loud-into-quiet transition can be noise, need 2 quiet ticks in a row
+// before closing a char, otherwise repeated letters split wrong
+function onQuiet() {
+  quietTicks++;
+  if (inTone && quietTicks >= 2) {
+    out += curSym;
+    inTone = false; curSym = null;
+    refreshOut();
+  }
+}
+
+function refreshOut() {
+  outEl.value = out;
+  if (armed) setDec(out.length + " chars so far");
+}
+
+// one place decides pass/fail so the mic path and the wav path can never
+// disagree about what a decode is worth
+function verdict(raw, repeats) {
+  let text = raw, note = "";
+  if (repeats && text.length > 1) {
+    let merged = "", busted = 0;
+    for (let i = 0; i + 1 < text.length; i += 2) {
+      if (text[i] === text[i + 1]) merged += text[i];
+      else { merged += text[i]; busted++; } // half a pair got eaten, checksum will judge
+    }
+    if (text.length % 2 === 1) { merged += text[text.length - 1]; busted++; }
+    text = merged;
+    if (busted > 0) note = busted + " chirp" + (busted === 1 ? "" : "s") + " didn't survive";
+  }
+  if (text.length < 2) {
+    return { body: text, msg: "done: " + text.length + " chars (too short to checksum). listening for the next one", bad: false };
+  }
+  const body = text.slice(0, -1), got = text[text.length - 1];
+  if (got === checksumChar(body)) {
+    return { body: body, msg: "done: " + body.length + " chars, checksum ok" + (note ? " (" + note + ")" : "") + ". listening for the next one", bad: false };
+  }
+  return { body: body, msg: "done: " + body.length + " chars but the checksum failed" + (note ? " (" + note + ")" : "") + " — a chirp got eaten somewhere. volume up and try again", bad: true };
+}
+
+function finishDecode() {
+  const was2x = extraLeaders >= 2;
+  armed = false; leadCount = 0; leadWasLoud = false;
+  extraLeaders = 0; extraLoud = false;
+  inTone = false; curSym = null; quietTicks = 0;
+  const v = verdict(out, was2x);
+  outEl.value = v.body;
+  setDec(v.msg, v.bad);
+}
+
+async function startListening() {
+  try {
+    const stream = await getMic();
+    const actx = getActx();
+    const src = actx.createMediaStreamSource(stream);
+    analyser = actx.createAnalyser();
+    analyser.fftSize = 1024;
+    // don't connect this to destination unless you want to hear your own mic, learned that the hard way
+    src.connect(analyser);
+    td = new Float32Array(analyser.fftSize);
+    listening = true;
+    armed = false; leadCount = 0; leadWasLoud = false;
+    extraLeaders = 0; extraLoud = false;
+    out = ""; outEl.value = "";
+    setDec("listening... play the chirps");
+    btnListen.disabled = true; btnQuiet.disabled = false;
+    drawSpec();
+    tick();
+  } catch (e) {
+    setDec("mic denied or failed: " + e.message, true);
+  }
+}
+
+function stopListening() {
+  listening = false;
+  clearTimeout(tickTimer);
+  cancelAnimationFrame(specAnim);
+  specAnim = null;
+  levelEl.textContent = "";
+  btnListen.disabled = false; btnQuiet.disabled = true;
+  setDec("stopped");
+}
+
+// ---------- decoding from a saved wav ----------
+// reads back exactly what the save wav button writes (16 bit mono pcm).
+// point it at anything else and it either errors or produces garbage
+function readWav(buf) {
+  const v = new DataView(buf);
+  if (v.byteLength < 44) return null;
+  const tag = (o) => String.fromCharCode(v.getUint8(o), v.getUint8(o + 1), v.getUint8(o + 2), v.getUint8(o + 3));
+  if (tag(0) !== "RIFF" || tag(8) !== "WAVE") return null;
+  let o = 12, fmt = null, dataAt = -1, dataSize = 0;
+  while (o + 8 <= v.byteLength) {
+    const id = tag(o), size = v.getUint32(o + 4, true);
+    if (id === "fmt " && size >= 16) {
+      fmt = { pcm: v.getUint16(o + 8, true), ch: v.getUint16(o + 10, true), rate: v.getUint32(o + 12, true), bits: v.getUint16(o + 22, true) };
+    } else if (id === "data") {
+      dataAt = o + 8; dataSize = Math.min(size, v.byteLength - o - 8);
+    }
+    o += 8 + size + (size % 2);
+  }
+  if (!fmt || dataAt < 0 || fmt.pcm !== 1 || fmt.bits !== 16 || fmt.ch !== 1) return null;
+  const n = Math.floor(dataSize / 2);
+  const samples = new Float32Array(n);
+  for (let i = 0; i < n; i++) samples[i] = v.getInt16(dataAt + i * 2, true) / 32768;
+  return { samples: samples, rate: fmt.rate };
+}
+
+// same state machine as the mic loop, just walking the file in windows
+// instead of waiting on live ticks. copied rather than merged on purpose,
+// didn't want to refactor the working path the night before a devlog
+function decodeWav(samples, sr) {
+  const win = 1024, step = Math.floor(sr * 0.03);
+  let armed = false, leads = 0, leadLoud = false;
+  let extra = 0, extraLoud = false;
+  let inTone = false, curSym = null, quiet = 0, text = "";
+
+  const closeChar = () => { if (inTone) { text += curSym; inTone = false; curSym = null; } };
+
+  for (let at = 0; at + win <= samples.length; at += step) {
+    let rms = 0;
+    for (let i = 0; i < win; i++) rms += samples[at + i] * samples[at + i];
+    rms = Math.sqrt(rms / win);
+    if (rms < 0.004) {
+      quiet++;
+      if (inTone && quiet >= 2) closeChar();
+      continue;
+    }
+    const chunk = samples.subarray(at, at + win);
+    const leadE = probe(chunk, sr, LEADER[0]) + probe(chunk, sr, LEADER[1]);
+    const endE  = probe(chunk, sr, END[0])    + probe(chunk, sr, END[1]);
+
+    if (!armed) {
+      if (leadE > 0.02) {
+        if (!leadLoud) { leads++; leadLoud = true; }
+      } else {
+        leadLoud = false;
+      }
+      if (leads >= 3) {
+        armed = true; extra = 0; extraLoud = false;
+        inTone = false; curSym = null; quiet = 0;
+      }
+      continue;
+    }
+    if (endE > 0.02) { closeChar(); break; }
+    if (leadE > 0.02) {
+      if (!extraLoud) { extraLoud = true; if (text.length === 0 && !inTone) extra++; }
+    } else {
+      extraLoud = false;
+    }
+
+    let best = null, bestScore = 0;
+    for (const ch in TONES) {
+      const t = TONES[ch];
+      const s = probe(chunk, sr, t[0]) + probe(chunk, sr, t[1]);
+      if (s > bestScore) { bestScore = s; best = ch; }
+    }
+    if (bestScore > 0.012) {
+      quiet = 0;
+      if (!inTone) { inTone = true; curSym = best; }
+      else if (best !== curSym) { text += curSym; curSym = best; }
+    } else {
+      quiet++;
+      if (inTone && quiet >= 2) closeChar();
+    }
+    if (text.length > 400) break;
+  }
+  closeChar();
+  return { text: text, repeats: extra >= 2 };
+}
+
+// ---------- spectrogram ----------
+const spec = document.getElementById("spec");
+const sctx = spec.getContext("2d");
+let specAnim = null;
+
+function drawSpec() {
+  if (!listening || !analyser) return;
+  const w = spec.width, h = spec.height;
+  // scroll the whole thing left 2px and draw a new column on the right,
+  // cheaper than keeping a history of frames
+  sctx.drawImage(spec, -2, 0);
+  sctx.fillStyle = "#060807";
+  sctx.fillRect(w - 2, 0, 2, h);
+  const bins = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(bins);
+  for (let i = 0; i < bins.length; i++) {
+    const v = bins[i] / 255;
+    if (v < 0.06) continue;
+    sctx.fillStyle = "rgba(126, 224, 140, " + v + ")";
+    const y = h - (i / bins.length) * h;
+    sctx.fillRect(w - 2, y, 2, Math.max(1, h / bins.length));
+  }
+  specAnim = requestAnimationFrame(drawSpec);
+}
+
+// ---------- wiring ----------
+const $ = (id) => document.getElementById(id);
+const msgEl = $("msg"), outEl = $("out"), countEl = $("count");
+const encStatus = $("encStatus"), decStatus = $("decStatus"), levelEl = $("level");
+const btnPlay = $("play"), btnStop = $("stop"), btnWav = $("wav");
+const btnListen = $("listen"), btnQuiet = $("quiet");
+const twiceEl = $("twice"), wavEl = $("wavfile");
+
+function setEnc(s, bad) { encStatus.textContent = s; encStatus.className = "status" + (bad ? " bad" : ""); }
+function setDec(s, bad) { decStatus.textContent = s; decStatus.className = "status" + (bad ? " bad" : ""); }
+
+function cleanMsg() {
+  // lowercase and drop anything the tone map can't handle yet
+  return msgEl.value.toLowerCase().split("").filter(c => TONES[c] !== undefined).join("");
+}
+
+function updateCount() {
+  const n = cleanMsg().length;
+  if (n === 0) { countEl.textContent = "0 chars"; return; }
+  const slots = twiceEl.checked ? (n + 1) * 2 : n + 1; // the +1 is the checksum char
+  countEl.textContent = n + " chars ~ " + (slots * (CHIRP + GAP) + 0.7).toFixed(1) + "s" + (twiceEl.checked ? " (2x)" : "");
+}
+msgEl.addEventListener("input", updateCount);
+twiceEl.addEventListener("change", updateCount);
+
+btnPlay.onclick = () => {
+  const msg = cleanMsg();
+  const dropped = msgEl.value.length - msg.length;
+  if (!msg) { setEnc("nothing to send (letters, numbers and basic punctuation only)", true); return; }
+  const twice = twiceEl.checked;
+  // checksum rides along as one extra char, the decoder grades the whole thing
+  const payload = msg + checksumChar(msg);
+  const enc = encodeMessage(payload, twice);
+  lastEnc = enc;
+  stopPlayback();
+  playEncoded(enc);
+  setEnc("playing " + msg.length + " chars (" + enc.secs.toFixed(1) + "s)"
+    + (twice ? ", each sent twice" : "")
+    + (dropped > 0 ? ", dropped " + dropped + " char" + (dropped > 1 ? "s" : "") + " i can't encode yet" : ""), false);
+};
+
+btnStop.onclick = () => { stopPlayback(); setEnc("stopped"); };
+
+btnWav.onclick = () => {
+  if (!lastEnc) { setEnc("play something first, then you can save it", true); return; }
+  saveWav(lastEnc);
+  setEnc("saved soundpost.wav to downloads", false);
+};
+
+btnListen.onclick = startListening;
+btnQuiet.onclick = stopListening;
+
+wavEl.addEventListener("change", async () => {
+  const f = wavEl.files[0];
+  if (!f) return;
+  try {
+    const wav = readWav(await f.arrayBuffer());
+    if (!wav) { setDec("couldn't read that wav — it needs to be one the save wav button wrote", true); return; }
+    const r = decodeWav(wav.samples, wav.rate);
+    if (r.text.length === 0) { setDec("decoded nothing from that file. was it actually a soundpost recording?", true); return; }
+    const v = verdict(r.text, r.repeats);
+    outEl.value = v.body;
+    setDec("from file: " + v.msg, v.bad);
+  } catch (e) {
+    setDec("wav decode blew up: " + e.message, true);
+  }
+});
+
+msgEl.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    e.preventDefault();
+    btnPlay.click();
+  }
+});
+
+// build the tone table from the same object the encoder uses, that way the
+// page and the code can never disagree about what maps to what
+(function fillToneMap() {
+  const keys = Object.keys(TONES);
+  const lines = [];
+  for (let i = 0; i < keys.length; i += 4) {
+    lines.push(keys.slice(i, i + 4).map(k => {
+      const t = TONES[k];
+      const label = k === " " ? "space" : k;
+      return (label + " ").padEnd(7) + t[0] + "/" + t[1];
+    }).join("   "));
+  }
+  $("tonemap").textContent = lines.join("\n");
+})();
+
+</script>
+</body>
+</html>
