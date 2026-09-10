@@ -656,6 +656,7 @@ wavEl.addEventListener("change", async () => {
   try {
     const wav = readWav(await f.arrayBuffer());
     if (!wav) { setDec("couldn't read that wav — it needs to be one the save wav button wrote", true); return; }
+    wavEl.value = '';
     const r = decodeWav(wav.samples, wav.rate);
     if (r.text.length === 0) { setDec("decoded nothing from that file. was it actually a soundpost recording?", true); return; }
     const v = verdict(r.text, r.repeats);
