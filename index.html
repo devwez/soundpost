@@ -7,115 +7,133 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    background: #0b0d0c;
-    color: #b6c2ba;
+    background: #0a0c0b;
+    color: #a8b8ad;
     font-family: "Cascadia Code", Consolas, monospace;
     max-width: 680px;
     margin: 0 auto;
-    padding: 28px 20px 60px;
+    padding: 32px 20px 80px;
     font-size: 14px;
-    line-height: 1.55;
+    line-height: 1.5;
   }
   ::selection { background: #2c4a33; }
   h1 {
-    font-size: 22px;
-    color: #9fe0aa;
+    font-size: 20px;
+    color: #8fd4a0;
     font-weight: 600;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
+    display: inline-block;
   }
-  .tag { color: #6a7a70; font-size: 12px; margin-top: 4px; }
+  .ver { color: #3f5c4a; font-size: 11px; margin-left: 6px; vertical-align: middle; }
+  .tagline {
+    color: #5a6a60;
+    font-size: 13px;
+    margin-top: 6px;
+    line-height: 1.6;
+  }
+  .tagline em { color: #6a7a70; font-style: normal; }
   section {
-    margin-top: 26px;
-    border-top: 1px dashed #233028;
-    padding-top: 18px;
+    margin-top: 30px;
+    border-top: 1px solid #1a2420;
+    padding-top: 16px;
   }
   h2 {
-    font-size: 12px;
-    color: #7a8a80;
+    font-size: 11px;
+    color: #5a6a60;
     font-weight: normal;
-    text-transform: lowercase;
-    letter-spacing: 1px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
     margin-bottom: 10px;
   }
   textarea {
     width: 100%;
-    background: #0e1210;
-    border: 1px solid #26332b;
-    color: #d4e2d8;
+    background: #0c100e;
+    border: 1px solid #1e2a24;
+    color: #c8d8cd;
     font-family: inherit;
     font-size: 14px;
-    padding: 10px;
+    padding: 10px 12px;
     resize: vertical;
     outline: none;
   }
-  textarea:focus { border-color: #3a5244; }
-  textarea::placeholder { color: #4a564e; }
+  textarea:focus { border-color: #2c4a33; }
+  textarea::placeholder { color: #3a4a40; }
   .under {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     margin-top: 8px;
     flex-wrap: wrap;
   }
   button {
-    background: #16211b;
-    color: #b6c2ba;
-    border: 1px solid #2c3a31;
-    padding: 7px 14px;
+    background: #141e18;
+    color: #a8b8ad;
+    border: 1px solid #243028;
+    padding: 6px 12px;
     font-family: inherit;
-    font-size: 13px;
+    font-size: 12px;
     border-radius: 2px;
     cursor: pointer;
+    transition: background 0.15s;
   }
-  button:hover { background: #1e2c23; }
-  button:disabled { opacity: .35; cursor: default; }
-  button.go { border-color: #3f5c4a; color: #9fe0aa; }
-  .k { color: #56645b; font-size: 11px; }
-  .count { color: #6a7a70; font-size: 12px; min-width: 110px; }
-  .status { color: #6a7a70; font-size: 12px; }
-  .status.ok { color: #9fe0aa; }
-  .status.bad { color: #d98a7a; }
+  button:hover { background: #1c2c22; }
+  button:disabled { opacity: .3; cursor: default; }
+  button.go { border-color: #3a5244; color: #8fd4a0; padding: 6px 16px; }
+  .k { color: #4a5a50; font-size: 11px; }
+  .count { color: #5a6a60; font-size: 12px; min-width: 100px; }
+  .status { color: #5a6a60; font-size: 12px; margin-top: 4px; }
+  .status.ok { color: #8fd4a0; }
+  .status.bad { color: #c47a6a; }
   canvas {
     display: block;
     width: 100%;
-    height: 120px;
+    height: 100px;
     background: #060807;
-    border: 1px solid #1c2620;
-    margin-top: 10px;
+    border: 1px solid #161e1a;
+    margin-top: 8px;
   }
-  .level { color: #4a564e; font-size: 11px; }
-  p.notes { color: #8a988e; font-size: 13px; margin-bottom: 12px; }
-  pre#tonemap {
-    background: #0e1210;
-    border: 1px solid #1c2620;
-    padding: 12px;
-    font-size: 11px;
+  .level { color: #3a4a40; font-size: 10px; margin-top: 2px; }
+  .note { color: #4a5a50; font-size: 11px; font-style: italic; margin: 8px 0; }
+  .how {
     color: #7a8a80;
-    overflow-x: auto;
-    line-height: 1.7;
+    font-size: 13px;
+    line-height: 1.65;
+    margin: 0 0 14px;
   }
-  .known { color: #7a8a80; font-size: 12px; margin: 12px 0 4px; }
+  pre#tonemap {
+    background: #0c100e;
+    border: 1px solid #161e1a;
+    padding: 10px 12px;
+    font-size: 10px;
+    color: #5a6a60;
+    overflow-x: auto;
+    line-height: 1.8;
+    margin-bottom: 14px;
+  }
+  .known { color: #6a7a70; font-size: 11px; margin: 0 0 4px; }
   ul { list-style: none; }
-  li { color: #6a7a70; font-size: 12px; padding-left: 14px; position: relative; }
-  li:before { content: "-"; position: absolute; left: 0; color: #3f5c4a; }
+  li { color: #5a6a60; font-size: 11px; padding-left: 10px; position: relative; margin-bottom: 2px; }
+  li:before { content: "-"; position: absolute; left: 0; color: #3a5244; }
+  .footer { color: #2a3a30; font-size: 10px; margin-top: 40px; border-top: 1px solid #141e18; padding-top: 10px; }
 </style>
 </head>
 <body>
 
-<h1>soundpost</h1>
-<p class="tag">sends text through the air as sound. no internet, no bluetooth, just a speaker and a mic.</p>
+<h1>soundpost</h1><span class="ver">v0.4</span>
+<p class="tagline">sends text through the air as sound. <em>no internet, no bluetooth, just a speaker and a mic.</em></p>
+<p class="note">built for stardance. probably works better on laptop speakers than my old headphones did.</p>
 
 <section>
   <h2>send</h2>
-  <textarea id="msg" rows="3" placeholder="type something..."></textarea>
+  <textarea id="msg" rows="3" placeholder="type something.. (a-z 0-9 and basic punctuation)"></textarea>
   <div class="under">
     <span class="count" id="count">0 chars</span>
     <button class="go" id="play">play</button>
     <button id="stop">stop</button>
     <button id="wav">save wav</button>
-    <label class="k"><input type="checkbox" id="twice"> send each char twice (noisy rooms)</label>
-    <span class="k">ctrl+enter plays too</span>
+    <label class="k"><input type="checkbox" id="twice"> 2x mode (noisy room)</label>
   </div>
+  <p class="note">ctrl+enter plays too. uppercase gets lowercased before sending.</p>
   <p class="status" id="encStatus"></p>
 </section>
 
@@ -126,33 +144,36 @@
     <button class="go" id="listen">start listening</button>
     <button id="quiet" disabled>stop</button>
     <label class="k">or decode a wav: <input type="file" id="wavfile" accept=".wav,audio/wav"></label>
-    <span class="status" id="decStatus">start listening, then hit play (on this or another device)</span>
   </div>
-  <canvas id="spec" width="640" height="120"></canvas>
+  <p class="status" id="decStatus">hit start listening, then play the chirps on this or another device</p>
+  <canvas id="spec" width="640" height="100"></canvas>
   <span class="level" id="level"></span>
 </section>
 
 <section>
   <h2>how it works</h2>
-  <p class="notes">
-    every character becomes one short chirp made of two tones playing at the same time.
-    three leader chirps go first so the decoder knows where the message starts (five in
-    2x mode — the count is how the decoder knows), and an end marker (higher than any
-    letter) says when to stop. one extra chirp rides at the end as a checksum, so the
-    decoder can tell you it misheard something instead of silently handing you garbage.
-    the decoder listens on the mic and matches what it hears against the tone table.
+  <p class="how">
+    each char gets its own chirp — two tones at the same time, 80ms long.
+    the decoder watches the mic for a pattern of 3 leader chirps (above every
+    letter frequency on purpose) and only starts reading once it sees them.
+    end marker is even higher so it can never be confused with a real char.
+    one checksum chirp at the end so the decoder can tell you it misheard
+    instead of just giving you garbage. that's the whole thing.
   </p>
+  <p class="note">if you want to see what the chirps look like, turn your mic on and play something — the spectrogram below shows what the mic picks up in real time</p>
   <pre id="tonemap"></pre>
-  <p class="known">known issues:</p>
+  <p class="known">known issues (yes i know about all of these):</p>
   <ul>
-    <li>needs a quiet room, the mic hears absolutely everything</li>
-    <li>repeated letters (ll, ss) sometimes merge into one. the gap between chars is 90ms to make that less likely — 2x mode doesn't have this problem since doubles are on purpose there</li>
-    <li>the checksum catches a bad chirp but can't fix it, it just tells you to send again. 2x mode is the closest thing to an actual fix so far</li>
-    <li>wav decoding only understands files the save wav button wrote (16 bit mono pcm). feed it music and you get garbage back</li>
-    <li>only handles a-z, 0-9 and basic punctuation, everything else gets dropped before sending</li>
-    <li>if nothing decodes, turn your volume up. the level readout below the spectrogram shows what the mic is picking up</li>
+    <li>needs a quiet room. the mic picks up everything — fan noise, typing, breathing</li>
+    <li>repeated letters (ll, ss) sometimes merge into one. 90ms gap helps but doesn't fully fix it — 2x mode doesn't have this problem since doubles are intentional there</li>
+    <li>checksum catches bad chirps but can't fix them. it just says "send again." 2x mode is the closest thing to error correction right now</li>
+    <li>wav decode only reads files the save wav button wrote. feed it an mp3 and you get nothing useful back</li>
+    <li>only a-z, 0-9 and basic punctuation. anything else gets dropped silently before encoding</li>
+    <li>if nothing decodes, turn your volume up first — check the mic level readout below the spectrogram</li>
+    <li>the tone table has a gap after 's' because i changed the spacing halfway through building it and fixing it would break the decoder. it stays.</li>
   </ul>
 </section>
+<p class="footer">last updated aug 2026. if this is broken or weird, open an issue on github or just yell at me.</p>
 
 <script>
 "use strict";
