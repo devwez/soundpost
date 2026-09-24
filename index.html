@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Soundpost</title>
+<style>
+body{font-family:monospace;background:#111;color:#eee;margin:0;padding:1rem}
+header{margin-bottom:1rem}
+label{display:block;margin-top:.5rem}
+textarea{width:100%;background:#222;color:#ccc;padding:.5rem;border:none;border-radius:.25rem}
+button{margin:.25rem;padding:.5rem 1rem;background:#444;color:#eee;border:none;border-radius:.25rem}
+button.active{background:#555}
+#out{background:#222;color:#ccc;padding:.5rem;border:none;border-radius:.25rem}
+#log{font-size:.8rem;height:100px;overflow:auto;background:#222;color:#ccc;padding:.5rem;margin-top:.5rem;border-radius:.25rem}
+</style>
+</head>
+<body>
+<header>
+<h1>Soundpost</h1>
+<p>Send text by sound. No internet. Use a speaker and mic.</p>
+</header>
+<h2>Send</h2>
+<label>Message:<br><textarea id="msg" rows="2" placeholder="type here..."></textarea></label>
+<button id="play">Play</button>
+<button id="stop">Stop</button>
+
+<h2>Receive</h2>
+<label>Decoded:<br><textarea id="out" rows="3" readonly></textarea></label>
+<button id="listen">Start listening</button>
+<button id="stopListen" disabled>Stop</button>
+
+<h2>Log</h2>
+<div id="log"></div>
+
+<script>
+let actx, src, analyser, td, bufSize=1024, listening=false;
+const msgEl=document.getElementById('msg'), outEl=document.getElementById('out'),
+      playBtn=document.getElementById('play'), stopBtn=document.getElementById('stop'),
+      listenBtn=document.getElementById('listen'), stopListenBtn=document.getElementById('stopListen'), log=document.getElementById('log');
+const TONES={'a':[200,280],'b':[300,380],'c':[400,480],'d':[500,580],'e':[600,680],'f':[700,780],'g':[800,880],'h':[900,980],
+            'i':[1000,1080],'j':[1100,1180],'k':[1200,1280],'l':[1300,1380],'m':[1400,1480],'n':[1500,1580],'o':[1600,1680],
+            'p':[1700,1780],'q':[1800,1880],'r':[1900,1980],'s':[2000,2100],'t':[2200,2300],'u':[2400,2500],'v':[2600,2700],
+            'w':[2800,2900],'x':[3000,3100],'y':[3200,3300],'z':[3400,3500],'0':[3600,3700],'1':[3800,3900],'2':[4000,4100],
+            '3':[4200,4300],'4':[4400,4500],'5':[4600,4700],'6':[4800,4900],'7':[5000,5100],'8':[5200,5300],'9':[5400,5500],
+            ' ':[5600,5800],'.':[5900,5950],',':[6000,6050],'?':[6100,6150],'!':[6200,6250],'-':[6300,6350],'@':[6400,6450], '#':[6500,6550]};
+const CHIRP=.08, GAP=.09, END=[700,720]; // simple
+function encode(msg){let sr=48000, offset=0, samples=[];function addTone(f){for(let i=0;i<sr*CHIRP;i++){samples.push(Math.sin(2*Math.PI*f*i/sr));}}for(const ch of msg){let freq=TONES[ch];if(!freq)continue;addTone(freq[0]);addTone(freq[1]);offset+=CHIRP+GAP;}return samples;}
+playBtn.onclick=function(){let msg=msgEl.value.toLowerCase(), samples=encode(msg);if(!actx)actx=new AudioContext();let buf=actx.createBuffer(1,samples.length,actx.sampleRate);buf.getChannelData(0).set(samples);let src=actx.createBufferSource();src.buffer=buf;src.connect(actx.destination);src.start();}
+stopBtn.onclick=function(){if(actx){actx.close();actx=null;}}
+listenBtn.onclick=function(){navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{let ac=actx||new AudioContext();src=ac.createMediaStreamSource(stream);analyser=ac.createAnalyser();analyser.fftSize=bufSize;src.connect(analyser);listening=true;tick();});}
+stopListenBtn.onclick=function(){listening=false;listenBtn.disabled=false;stopListenBtn.disabled=true;}
+function tick(){if(!listening)return;analyser.getFloatTimeDomainData(td||new Float32Array(analyser.fftSize));let rms=0;for(let v of td)rms+=v*v;rm= Math.sqrt(rms/td.length);outEl.value='';}
+</script>
+</body>
+</html>
