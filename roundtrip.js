@@ -5,8 +5,8 @@ const m = html.match(/<script>([\s\S]*?)<\/script>/);
 let src = m[1].split("// ---------- browser bits ----------")[0];
 
 let mod = {};
-new Function("grab", src + "\ngrab({TONES, ORDER, checksumChar, encode, decode});")((o) => Object.assign(mod, o));
-const { encode, decode } = mod;
+new Function("grab", src + "\ngrab({TONES, ORDER, checksumChar, encode, decode, wavBytes, wavSamples});")((o) => Object.assign(mod, o));
+const { encode, decode, wavBytes, wavSamples } = mod;
 
 let fails = 0;
 const msgs = ["hello", "well", "aa", "llama", "mississippi", "bee", "hi#!", "a@b.c", "wow?", "end-", "soundpost v2"];
@@ -23,5 +23,13 @@ for (let i = 1000; i < 5000; i++) enc.samples[i] = (Math.random() - 0.5) * 0.9;
 const bad = decode(enc.samples, enc.sr);
 console.log("garbled:", bad.ok ? "FAIL (accepted)" : "OK (rejected: " + bad.reason + ")");
 if (bad.ok) fails++;
+for (const msg of msgs) {
+  const enc = encode(msg, 48000);
+  const w = wavSamples(wavBytes(enc.samples, enc.sr));
+  const r = decode(w.samples, w.sr);
+  const ok = r.ok && r.body === msg;
+  if (!ok) fails++;
+  console.log("wav", JSON.stringify(msg), "->", JSON.stringify(r.body), ok ? "OK" : "FAIL " + r.reason);
+}
 console.log(fails ? fails + " FAILURES" : "all roundtrips ok");
 process.exit(fails ? 1 : 0);
